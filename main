@@ -1,0 +1,322 @@
+import plotly.subplots as sp
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+color_palette = {
+    'Free': 'LightSkyBlue',
+    'Paid': 'MidnightBlue'}
+
+
+color_dict = {
+    'Teen': '#FFE87C',
+    'Everyone': '#D58A94',
+    'Mature 17+': '#7BCCB5',
+    'Adults only 18+': '#EE9A4D'}
+
+path = "googleplaystore.csv"
+df = pd.read_csv(path)
+
+df = df[['Installs', 'Android Ver', 'Rating', 'Reviews', 'Category', 'Type', 'Price', 'Content Rating']]
+columns_to_check = ['Installs', 'Android Ver', 'Rating', 'Reviews']
+df.dropna(subset=columns_to_check, inplace=True)
+df['Content Rating'] = df['Content Rating'].replace('Everyone 10+', 'Everyone')
+
+df['Installs'] = df['Installs'].str.replace(r'\D', '', regex=True)
+df['Installs'] = df['Installs'].str.replace(r'\+', '', regex=True)
+df['Installs'] = pd.to_numeric(df['Installs'])
+
+df['Android Ver'] = df['Android Ver'].str.extract(r'(\d+\.?\d*)')
+df['Android Ver'] = pd.to_numeric(df['Android Ver'])
+df['Reviews'] = pd.to_numeric(df['Reviews'])
+df = df[df['Android Ver'] > 4]
+df = df[df['Installs'] >= 1000]
+df['Price'] = df['Price'].str.replace('$', '').astype(float)
+
+df_paid_apps = df[(df['Type'] != "Free") & (df['Price'] <= 40) & (df['Rating'] > 2.5)]
+
+
+st.set_page_config(layout="wide")
+padding_top = 0
+
+st.markdown(f"""
+    <style>
+        .reportview-container .main .block-container{{
+            padding-top: {padding_top}rem;
+        }}
+    </style>""",
+    unsafe_allow_html=True,)
+
+
+common_label = "Applications type"
+st.sidebar.markdown(f"**{common_label}**")
+
+App_type = df['Type'].unique()
+types = []
+for option in App_type:
+    checked = st.sidebar.checkbox(label=option, value=True, key=option)
+    if checked:
+        types.append(option)
+num_types = len(types)
+
+
+common_label = "Categories"
+st.sidebar.markdown(f"**{common_label}**")
+top_8_categories = df['Category'].value_counts().head(8).index
+# categories = st.sidebar.multiselect("Select categories:", top_8_categories)
+categories = []
+for option in top_8_categories:
+    checked = st.sidebar.checkbox(label=option, value=True, key=option)
+    if checked:
+        categories.append(option)
+num_categories = len(categories)
+
+
+common_label = "Target audience"
+st.sidebar.markdown(f"**{common_label}**")
+target_audience = df['Content Rating'].unique()
+# target_audience_types = st.sidebar.multiselect("Select Target Audience:", target_audience)
+target_audience_types = []
+for option in target_audience:
+    checked = st.sidebar.checkbox(label=option, value=True, key=option)
+    if checked:
+        target_audience_types.append(option)
+num_target_audience= len(target_audience_types)
+
+# Using HTML markup for a colorful and big pretty font title
+st.markdown("<h1 style='color: #7E587E; font-size: 60px;'>Google Play Store Apps</h1>", unsafe_allow_html=True)
+
+st.markdown("<h1 style='color: #454545	; font-size: 25px;'>The differences between the average ratings of free apps "
+            "and paid apps in the Google Play store, in terms of category and the target audience for which the app "
+            "is intended</h1>", unsafe_allow_html=True)
+
+
+fig4 = go.Figure()
+
+if num_types > 0:
+    fig4 = sp.make_subplots(rows=1, cols=num_types)
+    for i, selected_type in enumerate(types):
+        type_data = df[df['Type'] == selected_type]
+        fig4.add_trace(
+            go.Violin(
+                x=type_data['Type'],
+                y=type_data['Rating'],
+                box_visible=True,
+                name=selected_type,
+                marker_color=color_palette[selected_type]), row=1, col=i + 1)
+
+    # fig4.update_xaxes(title_text='', showticklabels=False, showgrid=False, row=1, col=i + 1)  # Remove x-axis labels
+
+    # # Update y-axis options for subplots
+    # show_tick_labels = True if i == 0 else False
+    # fig4.update_yaxes(range=[1, 6],title_text='Rating', showticklabels=show_tick_labels, row=1, col=i+1)
+
+        fig4.update_xaxes(title_text='',showticklabels=False, row=1, col=i+1)  # Add x-axis title for the left subplot
+    # fig4.update_xaxes(title_text='Type', row=1, col=i+1)  # Add x-axis title for the left subplot
+    fig4.update_yaxes(title_text='Rating', row=1, col=1)  # Add y-axis title for the left subplot
+
+    for i in range(2, num_categories+1):
+        fig4.update_xaxes(title_text='', row=1, col=i)  # Remove x-axis title for the rest of the subplots
+        fig4.update_yaxes(showticklabels=False, row=1, col=i)  # Hide y-axis labels for the rest of the subplots
+
+    for i in range(1):
+        fig4.update_yaxes(range=[0, 5], row=1, col=i)  # Set x-axis range from 0 to 5 for all subplots
+
+    # Add the word "Type" under the plot
+    fig4.update_layout(
+        annotations=[
+            go.layout.Annotation(
+                text='Type',
+                xref='paper',
+                yref='paper',
+                x=0.5,
+                y=-0.15,
+                showarrow=False,
+                font=dict(size=14))])
+    # Add color legend
+    # fig4.update_layout(showlegend=True, title='Comparison of Ratings: Free vs. Paid Apps')
+    # fig4.update_traces(showlegend=True)
+    st.markdown("<h1 style='color: #7E587E; font-size: 35px;'>Comparison of Ratings: Free vs. Paid Apps</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "<h1 style='color: #454545	; font-size: 20px;'>This violin plot compares the ratings of different types of apps within each selected app type.</h1>", unsafe_allow_html=True)
+    st.plotly_chart(fig4)
+else:
+    st.write("No type selected. Please select at least one type.")
+
+
+fig1 = go.Figure()
+if num_categories > 0:
+    fig1 = sp.make_subplots(rows=1, cols=num_categories, subplot_titles=categories)
+    for i, selected_category in enumerate(categories):
+        category_data = df[df['Category'] == selected_category]
+        for j, selected_type in enumerate(types):
+            app_data = category_data[category_data['Type'] == selected_type]
+            fig1.add_trace(
+                go.Box(
+                    x=app_data['Type'],
+                    y=app_data['Rating'],
+                    name=f'{selected_type}',
+                    showlegend=False,
+                    marker=dict(
+                        color="MidnightBlue" if selected_type == 'Paid' else "LightSkyBlue"
+                    )
+                ),
+                row=1,
+                col=i + 1)
+        fig1.update_xaxes(title_text='', showticklabels=False, row=1,
+                          col=i + 1)  # Add x-axis title for the left subplot
+        # fig4.update_xaxes(title_text='Type', row=1, col=i+1)  # Add x-axis title for the left subplot
+        fig1.update_yaxes(title_text='Rating', row=1, col=1)  # Add y-axis title for the left subplot
+
+        for i in range(2, num_categories + 1):
+            fig1.update_xaxes(title_text='', row=1, col=i)  # Remove x-axis title for the rest of the subplots
+            fig1.update_yaxes(showticklabels=False, row=1, col=i)  # Hide y-axis labels for the rest of the subplots
+
+        for i in range(1):
+            fig1.update_yaxes(range=[0, 5], row=1, col=i)  # Set x-axis range from 0 to 5 for all subplots
+
+        # Add the word "Type" under the plot
+        fig1.update_layout(height=400, width=1200,
+            annotations=[
+                go.layout.Annotation(
+                    text='Type',
+                    xref='paper',
+                    yref='paper',
+                    x=0.5,
+                    y=-0.15,
+                    showarrow=False,
+                    font=dict(size=14))])
+
+    # Add legend for types
+    fig1.add_trace(
+        go.Scatter(
+            x=[None], y=[None],
+            mode='markers',
+            marker=dict(color="MidnightBlue"),
+            name='Paid'
+        )
+    )
+    fig1.add_trace(
+        go.Scatter(
+            x=[None], y=[None],
+            mode='markers',
+            marker=dict(color="LightSkyBlue"),
+            name='Free'
+        )
+    )
+    st.markdown("<h1 style='color: #7E587E; font-size: 35px;'>Comparison of Ratings: Free vs. Paid Apps (Top 8 Categories)</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "<h1 style='color: #454545	; font-size: 20px;'>This figure presents a comparison of ratings between free and paid apps in the top 8 app categories."
+        " Each box represents the rating distribution for each app type within a specific category, helping to visualize any differences in ratings based on"
+        " the app's pricing model.</h1>", unsafe_allow_html=True)
+    st.plotly_chart(fig1)
+
+
+else:
+    print("No categories selected. Please select at least one category.")
+
+#### FIG 3 START HEREfig3 = go.Figure()  # Initialize the figure variable
+fig3 = go.Figure()  # Initialize the figure variable
+
+if num_categories > 0 and num_target_audience > 0:
+    fig3 = sp.make_subplots(rows=1, cols=num_categories, subplot_titles=categories)
+
+    for i, selected_category in enumerate(categories):
+        category_data = df[df['Category'] == selected_category]
+
+        # Iterate over content ratings and plot bars
+        for j, rating in enumerate(target_audience_types):
+            data = category_data[category_data['Content Rating'] == rating]
+
+            # Calculate mean and standard deviation for the specific category and content rating
+            mean_rating = data['Rating'].mean()
+            std_rating = data['Rating'].std()
+
+            # If the category and content rating combination exists in the data, use the calculated values
+            # Otherwise, use the overall mean and standard deviation for the content rating
+            if pd.notnull(mean_rating):
+                mean = mean_rating
+            else:
+                mean = 0
+
+            if pd.notnull(std_rating):
+                std = std_rating
+            else:
+                std = 0
+
+            fig3.add_trace(
+                go.Bar(
+                    x=[mean],
+                    y=[rating],
+                    orientation='h',
+                    error_x=dict(
+                        type='data',
+                        array=[std],
+                        visible=True,
+                        color='black'
+                    ),
+                    marker=dict(
+                        color=color_dict.get(rating, '#000000')
+                        # Get the color based on the content rating from the dictionary
+                    )
+                ),
+                row=1,
+                col=i+1)
+
+    # Update layout
+    fig3.update_layout(
+        # title='Mean Ratings by Content Rating for Top 5 Categories',
+        height=400,
+        width=1200,
+        showlegend=False,
+        xaxis_title='X-Axis Title'  # Add a common x-axis title for all subplots together
+    )
+
+    fig3.update_xaxes(title_text='Mean Rating', row=1, col=1)  # Add x-axis title for the left subplot
+    fig3.update_yaxes(title_text='Target audience', row=1, col=1)  # Add y-axis title for the left subplot
+
+    for i in range(2, num_categories+1):
+        fig3.update_xaxes(title_text='', row=1, col=i)  # Remove x-axis title for the rest of the subplots
+        fig3.update_yaxes(showticklabels=False, row=1, col=i)  # Hide y-axis labels for the rest of the subplots
+
+    for i in range(1, num_categories+1):
+        fig3.update_xaxes(range=[0, 5], row=1, col=i)  # Set x-axis range from 0 to 5 for all subplots
+    st.markdown("<h1 style='color: #7E587E; font-size: 35px;'>Mean Ratings by Content Rating for Top 8 Categories</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "<h1 style='color: #454545	; font-size: 20px;'>This figure shows the mean ratings for different content ratings (target audiences) across the top 8 app categories."
+        " The horizontal bars represent the mean ratings, with error bars indicating the standard deviation."
+        " It helps to analyze the variation in ratings based on the content rating of the apps.</h1>", unsafe_allow_html=True)
+    st.plotly_chart(fig3)
+
+else:
+    st.write("No categories or target audience selected. Please select at least one of them.")
+fig2 = go.Figure()
+if num_target_audience > 0:
+    for selected_target_audience_type in target_audience_types:
+        # Filter data for selected target audience
+        target_audience_df = df_paid_apps[df_paid_apps['Content Rating'] == selected_target_audience_type]
+
+        fig2.add_trace(go.Scatter(x=target_audience_df['Price'],y=target_audience_df['Rating'],mode='markers',
+            name=selected_target_audience_type,hovertext=target_audience_df['Android Ver'],
+            hovertemplate=
+            '<b>Content Rating: %{marker.color}</b><br>' +
+            'Price: $%{x:.2f}<br>' +
+            'Rating: %{y}<br>' +
+            'Android Version: %{text}<br>' +
+            'Installs: %{customdata}',
+            marker=dict(size=8, opacity=0.7),customdata=target_audience_df['Installs'],marker_color=target_audience_df['Content Rating'].map(color_dict)))
+
+    fig2.update_layout(
+        hovermode='closest',
+        xaxis=dict(title='Price (in USD $)'),
+        yaxis=dict(title='Rating'),
+        legend_title='Target Audience',
+        width=800, height=500, showlegend=True)
+    st.markdown("<h1 style='color: #7E587E; font-size: 35px;'>App Ratings vs Price by Category</h1>", unsafe_allow_html=True)
+    st.markdown(
+        "<h1 style='color: #454545	; font-size: 20px;'>This scatter plot displays the relationship between app ratings and prices for"
+        " different target audience types. Each data point represents an app, with the color indicating the content rating. It allows for a comparison"
+        " of app ratings and prices within specific target audience categories.</h1>", unsafe_allow_html=True)
+    st.plotly_chart(fig2)
+else:
+    st.write("No target audience selected. Please select at least one target audience.")
